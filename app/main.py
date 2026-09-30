@@ -1,6 +1,5 @@
 import os
 import uuid
-import shutil
 import logging
 from pathlib import Path
 from typing import Optional, List
@@ -25,6 +24,13 @@ from app.utils.subtitle_utils import save_subtitles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("video_translator")
+ALLOWED_MEDIA_EXTENSIONS = {
+    ".mp4",
+    ".mkv",
+    ".mov",
+    ".webm",
+    ".wav",
+}
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -58,6 +64,7 @@ async def root():
         return FileResponse(str(index_file))
     return {"message": f"Welcome to {settings.APP_NAME}. Visit /docs for Swagger API documentation."}
 
+
 @app.get("/api/v1/health")
 async def health_check():
     """Returns system status, active modules, and environment readiness."""
@@ -73,7 +80,48 @@ async def health_check():
         "gemini_api_configured": bool(settings.GEMINI_API_KEY),
         "ffmpeg_status": "ready (bundled)"
     }
+async def save_uploaded_video(file: UploadFile, destination: Path) -> None:
+    """Validate and safely save an uploaded video within the configured size limit."""
 
+    filename = file.filename or ""
+    extension = Path(filename).suffix.lower()
+
+    if extension not in ALLOWED_MEDIA_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported media format. Allowed formats: MP4, MKV, MOV, WebM, WAV.",
+        )
+
+    max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    total_size = 0
+    chunk_size = 1024 * 1024
+
+    try:
+        with open(destination, "wb") as buffer:
+            while chunk := await file.read(chunk_size):
+                total_size += len(chunk)
+
+                if total_size > max_size:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"Video file is too large. "
+                            f"Maximum allowed size is {settings.MAX_UPLOAD_SIZE_MB} MB."
+                        ),
+                    )
+
+                buffer.write(chunk)
+
+    except HTTPException:
+        if destination.exists():
+            destination.unlink()
+        raise
+    except Exception:
+        if destination.exists():
+            destination.unlink()
+        raise
+    finally:
+        await file.close()
 async def _process_pipeline(
     file: UploadFile,
     languages: str,
@@ -83,13 +131,12 @@ async def _process_pipeline(
     api_key_override: Optional[str]
 ) -> VideoTranslationResponse:
     job_id = str(uuid.uuid4())[:8]
-    ext = Path(file.filename or "input.mp4").suffix or ".mp4"
+    ext = Path(file.filename or "").suffix.lower()
     saved_video_path = settings.UPLOAD_DIR / f"{job_id}{ext}"
 
-    # 1. Save uploaded file
     logger.info(f"[{job_id}] Saving uploaded video {file.filename}...")
-    with open(saved_video_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+
+    await save_uploaded_video(file, saved_video_path)
 
     # 2. Extract audio
     logger.info(f"[{job_id}] Extracting 16kHz mono audio track...")
