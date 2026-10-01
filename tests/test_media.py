@@ -18,6 +18,35 @@ def create_synthetic_wav(path: Path, duration_sec: float = 1.0, sample_rate: int
             data = struct.pack("<h", value)
             wav_file.writeframes(data)
 
+def create_synthetic_video(path: Path, duration_sec: float = 1.5):
+    """Creates a simple MP4 video with a black video stream and synthetic audio."""
+    proc = MediaProcessor()
+
+    dummy_wav = path.parent / f"{path.stem}_audio.wav"
+    create_synthetic_wav(dummy_wav, duration_sec=duration_sec)
+
+    cmd = [
+        proc.ffmpeg_exe,
+        "-y",
+        "-f", "lavfi",
+        "-i", f"color=c=black:s=320x240:d={duration_sec}",
+        "-i", str(dummy_wav),
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-shortest",
+        str(path),
+    ]
+
+    res = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert res.returncode == 0, (
+        f"Failed to generate test video: {res.stderr.decode()}"
+    )
+    assert path.exists()
 def test_media_processor_init():
     proc = MediaProcessor()
     assert Path(proc.ffmpeg_exe).exists()

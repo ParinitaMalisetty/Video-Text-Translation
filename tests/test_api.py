@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from httpx import AsyncClient, ASGITransport
 from app.main import app
-from tests.test_media import create_synthetic_wav
+from tests.test_media import create_synthetic_video
 
 @pytest.mark.asyncio
 async def test_health_endpoint():
@@ -25,16 +25,16 @@ async def test_root_dashboard():
 
 @pytest.mark.asyncio
 async def test_translate_endpoint_pipeline(tmp_path):
-    # Create sample WAV to simulate audio/video upload
-    sample_file = tmp_path / "sample.wav"
-    create_synthetic_wav(sample_file, duration_sec=1.5)
+    # Create sample video to simulate audio/video upload
+    sample_file = tmp_path / "sample.mp4"
+    create_synthetic_video(sample_file, duration_sec=1.5)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         with open(sample_file, "rb") as f:
             response = await client.post(
                 "/api/v1/translate",
-                files={"file": ("sample.wav", f, "audio/wav")},
+                files={"file": ("sample.mp4", f, "video/mp4")},
                 data={
                     "languages": "both",
                     "generate_subtitles": "true",
@@ -55,15 +55,15 @@ async def test_translate_endpoint_pipeline(tmp_path):
 
 @pytest.mark.asyncio
 async def test_translate_telugu_only(tmp_path):
-    sample_file = tmp_path / "sample.wav"
-    create_synthetic_wav(sample_file, duration_sec=1.0)
+    sample_file = tmp_path / "sample.mp4"
+    create_synthetic_video(sample_file, duration_sec=1.0)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         with open(sample_file, "rb") as f:
             response = await client.post(
                 "/api/v1/translate/telugu",
-                files={"file": ("sample.wav", f, "audio/wav")},
+                files={"file": ("sample.mp4", f, "video/mp4")},
                 data={"generate_subtitles": "true", "generate_dubbing": "false"}
             )
 
@@ -74,15 +74,15 @@ async def test_translate_telugu_only(tmp_path):
 
 @pytest.mark.asyncio
 async def test_translate_hindi_only(tmp_path):
-    sample_file = tmp_path / "sample.wav"
-    create_synthetic_wav(sample_file, duration_sec=1.0)
+    sample_file = tmp_path / "sample.mp4"
+    create_synthetic_video(sample_file, duration_sec=1.0)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         with open(sample_file, "rb") as f:
             response = await client.post(
                 "/api/v1/translate/hindi",
-                files={"file": ("sample.wav", f, "audio/wav")},
+                files={"file": ("sample.mp4", f, "video/mp4")},
                 data={"generate_subtitles": "true", "generate_dubbing": "false"}
             )
 
