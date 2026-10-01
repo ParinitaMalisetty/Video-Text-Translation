@@ -1,13 +1,12 @@
-import os
 import uuid
 import logging
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, Form, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.core.media_processor import MediaProcessor
@@ -16,7 +15,6 @@ from app.modules import (
     TeluguTranslationModule,
     HindiTranslationModule,
     TTSService,
-    TranscriptSegment,
     TranslationResult,
     VideoTranslationResponse
 )
@@ -39,9 +37,15 @@ app = FastAPI(
 )
 
 # CORS middleware
+allowed_origins = [
+    origin.strip()
+    for origin in settings.ALLOWED_ORIGINS.split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,10 +90,16 @@ async def save_uploaded_video(file: UploadFile, destination: Path) -> None:
     filename = file.filename or ""
     extension = Path(filename).suffix.lower()
 
-    if extension not in ALLOWED_MEDIA_EXTENSIONS:
+    allowed_extensions = {
+        ext.strip().lower()
+        for ext in settings.ALLOWED_VIDEO_EXTENSIONS.split(",")
+        if ext.strip()
+    }
+
+    if extension not in allowed_extensions:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported media format. Allowed formats: MP4, MKV, MOV, WebM, WAV.",
+            detail="Unsupported video format. Allowed formats: MP4, MKV, MOV, WebM.",
         )
 
     max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024

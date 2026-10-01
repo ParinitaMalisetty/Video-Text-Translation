@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     OUTPUT_DIR: Path = BASE_DIR / "storage" / "outputs"
     MAX_UPLOAD_SIZE_MB: int = 150
 
+    #Upload and output file formats
+    ALLOWED_VIDEO_EXTENSIONS: str = ".mp4,.mkv,.mov,.webm"
+    # Upload configuration
+    ALLOWED_VIDEO_EXTENSIONS: str = ".mp4,.mkv,.mov,.webm"
+
+    # CORS configuration
+    ALLOWED_ORIGINS: str = "http://localhost:8000"
+
     # TTS voices
     TELUGU_VOICE: str = "te-IN-MohanNeural"
     HINDI_VOICE: str = "hi-IN-MadhurNeural"
