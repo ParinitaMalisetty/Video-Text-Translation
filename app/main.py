@@ -267,19 +267,76 @@ async def translate_hindi_only(
         api_key_override=x_gemini_api_key
     )
 
+def get_safe_output_file(filename: str, allowed_extensions: set[str]) -> Path:
+    """Return an output file path only if it stays inside OUTPUT_DIR."""
+
+    if not filename or Path(filename).name != filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid output filename.",
+        )
+
+    extension = Path(filename).suffix.lower()
+
+    if extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported output file format.",
+        )
+
+    output_dir = settings.OUTPUT_DIR.resolve()
+    file_path = (output_dir / filename).resolve()
+
+    try:
+        file_path.relative_to(output_dir)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid output file path.",
+        )
+
+    return file_path
+
 @app.get("/api/v1/subtitles/{filename}")
 async def get_subtitle_file(filename: str):
-    """Download generated subtitle file (.srt or .vtt)."""
-    file_path = settings.OUTPUT_DIR / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Subtitle file not found")
-    media_type = "text/vtt" if filename.endswith(".vtt") else "application/x-subrip"
-    return FileResponse(str(file_path), media_type=media_type, filename=filename)
+    file_path = get_safe_output_file(
+        filename,
+        {".srt", ".vtt"},
+    )
+
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Subtitle file not found",
+        )
+
+    media_type = (
+        "text/vtt"
+        if file_path.suffix.lower() == ".vtt"
+        else "application/x-subrip"
+    )
+
+    return FileResponse(
+        str(file_path),
+        media_type=media_type,
+        filename=file_path.name,
+    )
 
 @app.get("/api/v1/audio/{filename}")
 async def get_audio_file(filename: str):
-    """Stream or download synthesized dubbed audio."""
-    file_path = settings.OUTPUT_DIR / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Audio file not found")
-    return FileResponse(str(file_path), media_type="audio/mpeg", filename=filename)
+    file_path = get_safe_output_file(
+        filename,
+        {".mp3", ".wav", ".m4a"},
+    )
+
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Audio file not found",
+        )
+
+    return FileResponse(
+        str(file_path),
+        media_type="audio/mpeg",
+        filename=file_path.name,
+    )
