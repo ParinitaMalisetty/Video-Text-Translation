@@ -90,3 +90,25 @@ async def test_translate_hindi_only(tmp_path):
         data = response.json()
         assert data["telugu_translation"] is None
         assert data["hindi_translation"] is not None
+@pytest.mark.asyncio
+async def test_subtitle_path_traversal_blocked():
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            "/api/v1/subtitles/../main.py"
+        )
+
+    assert response.status_code in {400, 404}
+
+
+@pytest.mark.asyncio
+async def test_audio_path_traversal_blocked():
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            "/api/v1/audio/../main.py"
+        )
+
+    assert response.status_code in {400, 404}
