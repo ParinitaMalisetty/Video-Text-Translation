@@ -22,13 +22,6 @@ from app.utils.subtitle_utils import save_subtitles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("video_translator")
-ALLOWED_MEDIA_EXTENSIONS = {
-    ".mp4",
-    ".mkv",
-    ".mov",
-    ".webm",
-    ".wav",
-}
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -378,6 +371,7 @@ async def get_subtitle_file(filename: str):
         media_type=media_type,
         filename=file_path.name,
     )
+
 
 @app.get("/api/v1/audio/{filename}")
 async def get_audio_file(filename: str):
