@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 import pytest
 from pathlib import Path
 from httpx import AsyncClient, ASGITransport
@@ -90,25 +91,25 @@ async def test_translate_hindi_only(tmp_path):
         data = response.json()
         assert data["telugu_translation"] is None
         assert data["hindi_translation"] is not None
-@pytest.mark.asyncio
-async def test_subtitle_path_traversal_blocked():
-    transport = ASGITransport(app=app)
+def test_subtitle_path_traversal_blocked():
+    from app.main import get_safe_output_file
 
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get(
-            "/api/v1/subtitles/../main.py"
+    with pytest.raises(HTTPException) as exc_info:
+        get_safe_output_file(
+            "../main.py",
+            {".srt", ".vtt"},
         )
 
-    assert response.status_code in {400, 404}
+    assert exc_info.value.status_code == 400
 
 
-@pytest.mark.asyncio
-async def test_audio_path_traversal_blocked():
-    transport = ASGITransport(app=app)
+def test_audio_path_traversal_blocked():
+    from app.main import get_safe_output_file
 
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get(
-            "/api/v1/audio/../main.py"
+    with pytest.raises(HTTPException) as exc_info:
+        get_safe_output_file(
+            "../main.py",
+            {".mp3", ".wav", ".m4a"},
         )
 
-    assert response.status_code in {400, 404}
+    assert exc_info.value.status_code == 400

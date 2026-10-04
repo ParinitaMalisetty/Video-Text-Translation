@@ -349,6 +349,7 @@ def get_safe_output_file(filename: str, allowed_extensions: set[str]) -> Path:
 
 @app.get("/api/v1/subtitles/{filename}")
 async def get_subtitle_file(filename: str):
+    """Download a generated subtitle file (.srt or .vtt)."""
     file_path = get_safe_output_file(
         filename,
         {".srt", ".vtt"},
@@ -375,6 +376,7 @@ async def get_subtitle_file(filename: str):
 
 @app.get("/api/v1/audio/{filename}")
 async def get_audio_file(filename: str):
+    """Stream or download synthesized dubbed audio."""
     file_path = get_safe_output_file(
         filename,
         {".mp3", ".wav", ".m4a"},
@@ -386,8 +388,14 @@ async def get_audio_file(filename: str):
             detail="Audio file not found",
         )
 
+    media_type_map = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".m4a": "audio/mp4",
+    }
+
     return FileResponse(
         str(file_path),
-        media_type="audio/mpeg",
+        media_type=media_type_map[file_path.suffix.lower()],
         filename=file_path.name,
     )
