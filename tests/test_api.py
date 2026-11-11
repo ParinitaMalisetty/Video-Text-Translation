@@ -1,3 +1,6 @@
+from urllib import response
+
+from fastapi import HTTPException
 import pytest
 from pathlib import Path
 from httpx import AsyncClient, ASGITransport
@@ -90,3 +93,78 @@ async def test_translate_hindi_only(tmp_path):
         data = response.json()
         assert data["telugu_translation"] is None
         assert data["hindi_translation"] is not None
+
+def test_subtitle_path_traversal_blocked():
+    from app.main import get_safe_output_file
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_safe_output_file(
+            r"..\main.py",
+            {".srt", ".vtt"},
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Invalid output filename."
+
+
+def test_audio_path_traversal_blocked():
+    from app.main import get_safe_output_file
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_safe_output_file(
+            r"..\main.py",
+            {".mp3", ".wav", ".m4a"},
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Invalid output filename."
+@pytest.mark.asyncio
+async def test_subtitle_download_success(tmp_path, monkeypatch):
+    from app.main import settings
+
+    output_dir = tmp_path / "outputs"
+    output_dir.mkdir()
+
+    subtitle_file = output_dir / "sample.srt"
+    subtitle_file.write_text(
+        "1\n00:00:00,000 --> 00:00:02,000\nHello World\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings, "OUTPUT_DIR", output_dir)
+
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
+        response = await client.get(
+            "/api/v1/subtitles/sample.srt"
+        )
+
+    assert response.status_code == 200
+    assert "Hello World" in response.text
+def test_output_symlink_escape_blocked(tmp_path, monkeypatch):
+    from app.main import get_safe_output_file, settings
+
+    output_dir = tmp_path / "outputs"
+    output_dir.mkdir()
+
+    outside_file = tmp_path / "secret.srt"
+    outside_file.write_text("Sensitive content", encoding="utf-8")
+
+    symlink = output_dir / "linked.srt"
+
+    try:
+        symlink.symlink_to(outside_file)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"Symlink creation is not available: {exc}")
+
+    monkeypatch.setattr(settings, "OUTPUT_DIR", output_dir)
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_safe_output_file("linked.srt", {".srt", ".vtt"})
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Invalid output file path."
