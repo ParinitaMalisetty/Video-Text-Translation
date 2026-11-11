@@ -133,7 +133,7 @@ async def _process_pipeline(
     voice_gender: str,
     api_key_override: Optional[str]
 ) -> VideoTranslationResponse:
-    job_id = str(uuid.uuid4())[:8]
+    job_id = str(uuid.uuid4())
     ext = Path(file.filename or "").suffix.lower()
     saved_video_path = settings.UPLOAD_DIR / f"{job_id}{ext}"
 
